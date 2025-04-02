@@ -18,7 +18,6 @@ const Game = ({ songFile, songTimingKey, onBackToSelection }) => {
   const [player2Combo, setPlayer2Combo] = useState(0);
   const [player1MaxCombo, setPlayer1MaxCombo] = useState(0); // Track maximum combo for player 1
   const [player2MaxCombo, setPlayer2MaxCombo] = useState(0); // Track maximum combo for player 2
-  const [comboFeedback, setComboFeedback] = useState({ player1: 0, player2: 0 });
 
   const startTime = useRef(null);
   const arrowIndex = useRef(0);
@@ -92,7 +91,7 @@ const Game = ({ songFile, songTimingKey, onBackToSelection }) => {
         }
         else if (songTimingKey === 'TeethSongTiming') {
           // For "Teeth"
-          startTime.current = Date.now() - 1200; // No offset
+          startTime.current = Date.now() - 1250; // No offset
           audioRef.current.volume = 0.5;
           audioRef.current.currentTime = 0; // Start at the beginning
         }
@@ -143,22 +142,34 @@ const Game = ({ songFile, songTimingKey, onBackToSelection }) => {
       }
 
       // Mark arrows as missed if they've passed the target time
-      setArrows((prevArrows) =>
-        prevArrows.map(arrow => {
+      setArrows((prevArrows) => {
+        let anyMissedP1 = false;
+        let anyMissedP2 = false;
+        
+        const updatedArrows = prevArrows.map(arrow => {
           if (!arrow.hit && !arrow.missed && currentTime > arrow.targetTime + hitWindow) {
-            // Reset combo when an arrow is missed
+            // Track if any arrows were missed by player
             if (arrow.player === 'player1') {
-              setPlayer1Combo(0);
-              setComboFeedback(prev => ({ ...prev, player1: 0 }));
+              anyMissedP1 = true;
             } else {
-              setPlayer2Combo(0);
-              setComboFeedback(prev => ({ ...prev, player2: 0 }));
+              anyMissedP2 = true;
             }
             return { ...arrow, missed: true };
           }
           return arrow;
-        })
-      );
+        });
+        
+        // Reset combo counter outside the map to avoid multiple state updates
+        if (anyMissedP1) {
+          setPlayer1Combo(0);
+        }
+        
+        if (anyMissedP2) {
+          setPlayer2Combo(0);
+        }
+        
+        return updatedArrows;
+      });
 
       // Remove arrows that have been on screen too long
       setArrows((prevArrows) =>
@@ -223,7 +234,7 @@ const Game = ({ songFile, songTimingKey, onBackToSelection }) => {
           if (timeDifference <= hitWindow) {
             arrowHit = true;
 
-            // Determine hit quality
+            // Determine hit quality - Modified scoring
             if (timeDifference <= hitWindow / 4) {
               hitQuality = 3; // Perfect
             } else if (timeDifference <= hitWindow / 2) {
@@ -243,31 +254,62 @@ const Game = ({ songFile, songTimingKey, onBackToSelection }) => {
           return arrow;
         });
 
-        // Update hit feedback and score
+        // Update hit feedback and score with new scoring system
         if (arrowHit) {
-          // Update score based on hit quality
-          const scoreToAdd = hitQuality * 100;
+          // Update score based on hit quality - Modified scores
+          let baseScore = 0;
+          switch (hitQuality) {
+            case 3: // Perfect
+              baseScore = 150;
+              break;
+            case 2: // Good
+              baseScore = 100;
+              break;
+            case 1: // Ok
+              baseScore = 50;
+              break;
+            default:
+              baseScore = 0;
+          }
 
           if (player === 'player1') {
-            setPlayer1Score(prev => prev + scoreToAdd);
-            // Increment combo counter
-            setPlayer1Combo(prev => {
-              const newCombo = prev + 1;
-              // Update max combo if current combo is higher
-              setPlayer1MaxCombo(current => Math.max(current, newCombo));
+            // Update the player1 combo first
+            setPlayer1Combo(prevCombo => {
+              const newCombo = prevCombo + .5;
+              // Update max combo
+              if (newCombo > player1MaxCombo) {
+                setPlayer1MaxCombo(newCombo);
+              }
+              
+              // Calculate score with the new combo value
+              const totalScore = Math.round(baseScore * (1 + newCombo / 100));
+              setPlayer1Score(prev => prev + totalScore);
+              
               return newCombo;
             });
-            setComboFeedback(prev => ({ ...prev, player1: prev.player1 + 1 }));
           } else {
-            setPlayer2Score(prev => prev + scoreToAdd);
-            // Increment combo counter
-            setPlayer2Combo(prev => {
-              const newCombo = prev + 1;
-              // Update max combo if current combo is higher
-              setPlayer2MaxCombo(current => Math.max(current, newCombo));
+            // Update the player2 combo first
+            setPlayer2Combo(prevCombo => {
+              const newCombo = prevCombo + .5;
+              // Update max combo
+              if (newCombo > player2MaxCombo) {
+                setPlayer2MaxCombo(newCombo);
+              }
+              
+              // Calculate score with the new combo value
+              const totalScore = Math.round(baseScore * (1 + newCombo / 100));
+              setPlayer2Score(prev => prev + totalScore);
+              
               return newCombo;
             });
-            setComboFeedback(prev => ({ ...prev, player2: prev.player2 + 1 }));
+          }
+        } else {
+          // If no arrow was hit, it's a miss
+          // Reset combo on miss
+          if (player === 'player1') {
+            setPlayer1Combo(0);
+          } else {
+            setPlayer2Combo(0);
           }
         }
 
@@ -277,7 +319,7 @@ const Game = ({ songFile, songTimingKey, onBackToSelection }) => {
 
     window.addEventListener('keydown', handleKeyPress);
     return () => window.removeEventListener('keydown', handleKeyPress);
-  }, [gameState]);
+  }, [gameState, player1MaxCombo, player2MaxCombo]);
 
   // Cleanup audio on unmount
   useEffect(() => {
@@ -383,7 +425,7 @@ const Game = ({ songFile, songTimingKey, onBackToSelection }) => {
               <div className="score-container">
                 <div className="score-box">{player1Score}</div>
                 <div className="combo-display">
-                  Combo x{comboFeedback.player1}
+                  Combo x{player1Combo}
                 </div>
               </div>
               <div className="controls-guide player1-controls">
@@ -414,7 +456,7 @@ const Game = ({ songFile, songTimingKey, onBackToSelection }) => {
               <div className="score-container">
                 <div className="score-box">{player2Score}</div>
                 <div className="combo-display">
-                  Combo x{comboFeedback.player2}
+                  Combo x{player2Combo}
                 </div>
               </div>
               <div className="controls-guide player2-controls">
