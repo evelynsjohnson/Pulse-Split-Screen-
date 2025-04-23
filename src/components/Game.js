@@ -1,195 +1,311 @@
 import React, { useState, useEffect, useRef } from 'react';
 import Arrow from './Arrow';
-import { YIAMSongTiming, SOYSongTiming, TeethSongTiming } from '../songTiming';
-
 import upArrow from '../assets/upArrow.png';
 import downArrow from '../assets/downArrow.png';
 import leftArrow from '../assets/leftArrow.png';
 import rightArrow from '../assets/rightArrow.png';
 
+import upPurpleArrow from '../assets/upPurpleArrow.png';
+import downPurpleArrow from '../assets/downPurpleArrow.png';
+import leftPurpleArrow from '../assets/leftPurpleArrow.png';
+import rightPurpleArrow from '../assets/rightPurpleArrow.png';
+
+
+import { YIAMSongTiming, SOYSongTiming, TeethSongTiming, FYOSongTiming, SharksSongTiming,
+  EOTRSongTiming, BangSongTiming, ParisSongTiming, LifeForceSongTiming, GladiatorSongTiming,
+  StargazingSongTiming, InsaneSongTiming, GOKSongTiming, BleedSongTiming, FGSongTiming,
+  STRSongTiming
+} from '../songTiming';
+
+/*
+NOTE TO SELF:
+- When playing the arrows at the same time (STR)...
+  1. We don't know when both arrows are appearing at the same time vs just one player (some indicator when swaps, different colored arrows? text?)
+  2. Sometimes we repeat what the other person said when it's just one person (that's just funny)
+*/
+  
 const Game = ({ songFile, songTimingKey, onBackToSelection }) => {
   const [arrows, setArrows] = useState([]);
   const [player1Score, setPlayer1Score] = useState(0);
   const [player2Score, setPlayer2Score] = useState(0);
   const [player1Ready, setPlayer1Ready] = useState(false);
   const [player2Ready, setPlayer2Ready] = useState(false);
+  const [player1ReadyToGoBack, setPlayer1ReadyToGoBack] = useState(false);
+  const [player2ReadyToGoBack, setPlayer2ReadyToGoBack] = useState(false);
   const [gameState, setGameState] = useState('waiting'); // 'waiting', 'playing', 'ended'
   const [player1Combo, setPlayer1Combo] = useState(0);
   const [player2Combo, setPlayer2Combo] = useState(0);
-  const [player1MaxCombo, setPlayer1MaxCombo] = useState(0); // Track maximum combo for player 1
-  const [player2MaxCombo, setPlayer2MaxCombo] = useState(0); // Track maximum combo for player 2
+  const [player1MaxCombo, setPlayer1MaxCombo] = useState(0);
+  const [player2MaxCombo, setPlayer2MaxCombo] = useState(0);
+  const [player1Indicator, setPlayer1Indicator] = useState({ show: false, type: '', timestamp: 0 });
+  const [player2Indicator, setPlayer2Indicator] = useState({ show: false, type: '', timestamp: 0 });
 
   const startTime = useRef(null);
   const arrowIndex = useRef(0);
   const audioRef = useRef(null);
-  const hitWindow = 150; // Allow generous hit timing in milliseconds
-  const removeDelay = 2000; // Matches arrow fall animation duration
-  const arrowFallDuration = 2000; // Time it takes for an arrow to fall (matches CSS animation)
+  const hitWindow = 200;
+  const removeDelay = 2000;
+  const arrowFallDuration = 2000;
+  const [player1Stats, setPlayer1Stats] = useState({
+    arrowsHit: 0,
+    totalArrows: 0,
+    perfectHits: 0,
+    goodHits: 0,
+    okHits: 0,
+    misses: 0
+  });
+  const [player2Stats, setPlayer2Stats] = useState({
+    arrowsHit: 0,
+    totalArrows: 0,
+    perfectHits: 0,
+    goodHits: 0,
+    okHits: 0,
+    misses: 0
+  });
 
-  // Get the appropriate song timing based on the prop
+  // Track key presses for anti-spam
+  const player1KeyPresses = useRef([]);
+  const player2KeyPresses = useRef([]);
+  const spamThreshold = 8; // Max key presses allowed in spamWindow
+  const spamWindow = 1000; // Time window in ms to check for spamming
+
   const getSongTiming = () => {
     switch (songTimingKey) {
-      case 'YIAMSongTiming':
-        return YIAMSongTiming;
-      case 'SOYSongTiming':
-        return SOYSongTiming;
-      case 'TeethSongTiming':
-        return TeethSongTiming;
-      default:
-        return YIAMSongTiming; // Default fallback
+      case 'YIAMSongTiming': return YIAMSongTiming;
+      case 'SOYSongTiming': return SOYSongTiming;
+      case 'TeethSongTiming': return TeethSongTiming;
+      case 'FYOSongTiming': return FYOSongTiming;
+      case 'SharksSongTiming': return SharksSongTiming;
+      case 'EOTRSongTiming': return EOTRSongTiming;
+      case 'BangSongTiming': return BangSongTiming;
+      case 'ParisSongTiming': return ParisSongTiming;
+      case 'LifeForceSongTiming': return LifeForceSongTiming;
+      case 'InsaneSongTiming': return InsaneSongTiming;
+      case 'StargazingSongTiming': return StargazingSongTiming;
+      case 'GladiatorSongTiming': return GladiatorSongTiming;
+      case 'STRSongTiming': return STRSongTiming;
+      case 'GOKSongTiming': return GOKSongTiming;
+      case 'FGSongTiming': return FGSongTiming;
+      case 'BleedSongTiming': return BleedSongTiming;
+      // case 'SongTiming': return SongTiming;
+      default: return YIAMSongTiming;
     }
   };
 
   const songTiming = getSongTiming();
   const directions = ['left', 'up', 'right', 'down'];
 
+  const showIndicator = (player, type) => {
+    // Simplify indicator types to only 'hit' or 'miss'
+    const simplifiedType = type === 'miss' ? 'miss' : 'hit';
+
+    setPlayer1Indicator({ show: true, type: simplifiedType, timestamp: Date.now() });
+    setPlayer2Indicator({ show: true, type: simplifiedType, timestamp: Date.now() });
+  };
+
+  // Effect to hide indicators after a delay
+  useEffect(() => {
+    if (player1Indicator.show) {
+      const timer = setTimeout(() => {
+        setPlayer1Indicator({ show: false, type: '', timestamp: 0 });
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [player1Indicator.timestamp]);
+
+  useEffect(() => {
+    if (player2Indicator.show) {
+      const timer = setTimeout(() => {
+        setPlayer2Indicator({ show: false, type: '', timestamp: 0 });
+      }, 500);
+      return () => clearTimeout(timer);
+    }
+  }, [player2Indicator.timestamp]);
+
   // Ready up logic
   useEffect(() => {
     const handleReadyKeyPress = (e) => {
       if (gameState !== 'waiting') return;
-
       const key = e.key.toLowerCase();
-
-      // Check if Player 1 pressed one of their keys (WASD)
-      if (['w', 'a', 's', 'd'].includes(key) && !player1Ready) {
-        setPlayer1Ready(true);
+      if (key === '*' || key === 'q' || key === '1') {
+        handleReturn();
+        return;
       }
-
-      // Check if Player 2 pressed one of their arrow keys
+      if (['w', 'a', 's', 'd'].includes(key)) setPlayer1Ready(true);
       if (['arrowup', 'arrowleft', 'arrowdown', 'arrowright'].includes(key) ||
         ['up', 'left', 'down', 'right'].includes(e.code.toLowerCase().replace('arrow', ''))) {
         setPlayer2Ready(true);
       }
     };
-
     window.addEventListener('keydown', handleReadyKeyPress);
     return () => window.removeEventListener('keydown', handleReadyKeyPress);
   }, [gameState, player1Ready, player2Ready]);
 
-  // Handle game start (without countdown)
+  // Handle end screen key presses
   useEffect(() => {
-    // If both players are ready, start game immediately
-    if (player1Ready && player2Ready && gameState === 'waiting') {
-      // Initialize audio
-      audioRef.current = new Audio(require(`../assets/${songFile}`));
+    const handleEndScreenKeyPress = (e) => {
+      if (gameState !== 'ended') return;
+      const key = e.key.toLowerCase();
+      if (key === 'q') setPlayer1ReadyToGoBack(prev => !prev);
+      else if (key === '1') setPlayer2ReadyToGoBack(prev => !prev);
+    };
+    window.addEventListener('keydown', handleEndScreenKeyPress);
+    return () => window.removeEventListener('keydown', handleEndScreenKeyPress);
+  }, [gameState]);
 
-      // Small timeout to give visual feedback that both players are ready
+  // Check if both players are ready to go back
+  useEffect(() => {
+    if (gameState === 'ended' && player1ReadyToGoBack && player2ReadyToGoBack) {
+      handleReturn();
+    }
+  }, [player1ReadyToGoBack, player2ReadyToGoBack, gameState]);
+
+  useEffect(() => {
+    if (player1Ready && player2Ready && gameState === 'waiting') {
+      audioRef.current = new Audio(songFile);
       setTimeout(() => {
         setGameState('playing');
+        audioRef.current.volume = 0.5;
+        audioRef.current.currentTime = 0;
 
-        // Configure start time and audio settings based on the selected song
         if (songTimingKey === 'YIAMSongTiming') {
-          // For "Yes I'm a Mess"
-          startTime.current = Date.now() + 800; // Offset to sync with song timing
-          audioRef.current.volume = 0.5;
-          audioRef.current.currentTime = 2; // Start at 2 seconds
+          startTime.current = Date.now() + 800;
         } else if (songTimingKey === 'SOYSongTiming') {
-          // For "Shape of You"
-          startTime.current = Date.now() - 500; // No offset
-          audioRef.current.volume = 0.5;
-          audioRef.current.currentTime = 0; // Start at the beginning
+          startTime.current = Date.now() - 1900;
         }
         else if (songTimingKey === 'TeethSongTiming') {
-          // For "Teeth"
-          startTime.current = Date.now() - 1250; // No offset
-          audioRef.current.volume = 0.5;
-          audioRef.current.currentTime = 0; // Start at the beginning
+          startTime.current = Date.now() - 1250;
         }
-        // Play the audio
+        else if (songTimingKey === 'FYOSongTiming') {
+          startTime.current = Date.now() - 1600;
+        }
+        else if (songTimingKey === 'EOTRSongTiming') {
+          startTime.current = Date.now() - 1800;
+        }
+        else if (songTimingKey === 'SharksSongTiming') {
+          startTime.current = Date.now() - 1900;
+        }
+        else if (songTimingKey === 'BangSongTiming') {
+          startTime.current = Date.now() - 1900;
+        }
+        else if (songTimingKey === 'LFSongTiming') {
+          startTime.current = Date.now() - 2000;
+        }
+        else {
+          startTime.current = Date.now() - 1950;
+        }
         audioRef.current.play();
-      }, 500); // Small delay for visual feedback
+      }, 500);
     }
   }, [player1Ready, player2Ready, gameState, songFile, songTimingKey]);
 
   // Arrow generation and game logic
   useEffect(() => {
     if (gameState !== 'playing') return;
-
     const interval = setInterval(() => {
       const currentTime = Date.now() - startTime.current;
-
-      // Spawn new arrows based on song timing
       while (
         arrowIndex.current < songTiming.length &&
         songTiming[arrowIndex.current].time <= currentTime
       ) {
-        const player1Direction = directions[Math.floor(Math.random() * directions.length)];
-        const player2Direction = directions[Math.floor(Math.random() * directions.length)];
-
-        setArrows((prevArrows) => [
-          ...prevArrows,
-          {
+        const { player } = songTiming[arrowIndex.current];
+        const newArrows = [];
+        
+        if (player === "1" || player === "both") {
+          const direction1 = directions[Math.floor(Math.random() * directions.length)];
+          setPlayer1Stats(prev => ({ ...prev, totalArrows: prev.totalArrows + 1 }));
+          newArrows.push({
             id: `${arrowIndex.current}-p1`,
             spawnTime: currentTime,
             targetTime: currentTime + arrowFallDuration,
-            direction: player1Direction,
+            direction: direction1,
             player: 'player1',
             hit: false,
             missed: false,
-          },
-          {
+          });
+        }
+        if (player === "2" || player === "both") {
+          const direction2 = directions[Math.floor(Math.random() * directions.length)];
+          setPlayer2Stats(prev => ({ ...prev, totalArrows: prev.totalArrows + 1 }));
+          newArrows.push({
             id: `${arrowIndex.current}-p2`,
             spawnTime: currentTime,
             targetTime: currentTime + arrowFallDuration,
-            direction: player2Direction,
+            direction: direction2,
             player: 'player2',
             hit: false,
             missed: false,
-          },
-        ]);
-
+          });
+        }
+        setArrows((prevArrows) => [...prevArrows, ...newArrows]);
         arrowIndex.current++;
       }
-
-      // Mark arrows as missed if they've passed the target time
       setArrows((prevArrows) => {
-        let anyMissedP1 = false;
-        let anyMissedP2 = false;
-        
         const updatedArrows = prevArrows.map(arrow => {
           if (!arrow.hit && !arrow.missed && currentTime > arrow.targetTime + hitWindow) {
-            // Track if any arrows were missed by player
             if (arrow.player === 'player1') {
-              anyMissedP1 = true;
+              setPlayer1Stats(prev => ({ ...prev, misses: prev.misses + 1 }));
+              setPlayer1Combo(0);
+              showIndicator('player1', 'miss');
             } else {
-              anyMissedP2 = true;
+              setPlayer2Stats(prev => ({ ...prev, misses: prev.misses + 1 }));
+              setPlayer2Combo(0);
+              showIndicator('player2', 'miss');
             }
             return { ...arrow, missed: true };
           }
           return arrow;
         });
-        
-        // Reset combo counter outside the map to avoid multiple state updates
-        if (anyMissedP1) {
-          setPlayer1Combo(0);
-        }
-        
-        if (anyMissedP2) {
-          setPlayer2Combo(0);
-        }
-        
         return updatedArrows;
       });
-
-      // Remove arrows that have been on screen too long
       setArrows((prevArrows) =>
-        prevArrows.filter((arrow) => currentTime - arrow.spawnTime < removeDelay)
+        prevArrows.filter((arrow) =>
+          !arrow.hit && (!arrow.missed || currentTime - arrow.spawnTime < removeDelay * 1.5)
+        )
       );
 
-      // Check if song has ended
       if (audioRef.current && audioRef.current.ended) {
         setGameState('ended');
         clearInterval(interval);
       }
     }, 10);
-
     return () => clearInterval(interval);
   }, [gameState, songTiming]);
+
+  // Check for key spamming
+  const checkForSpam = (player) => {
+    const now = Date.now();
+    const keyPresses = player === 'player1' ? player1KeyPresses.current : player2KeyPresses.current;
+
+    // Remove key presses older than our time window
+    const recentPresses = keyPresses.filter(time => now - time < spamWindow);
+
+    // Update the ref with only recent presses
+    if (player === 'player1') {
+      player1KeyPresses.current = recentPresses;
+    } else {
+      player2KeyPresses.current = recentPresses;
+    }
+
+    // If too many recent presses, penalize the player
+    if (recentPresses.length >= spamThreshold) {
+      if (player === 'player1') {
+        setPlayer1Score(prev => Math.max(0, prev - 100));
+        setPlayer1Combo(0);
+        showIndicator('player1', 'miss');
+      } else {
+        setPlayer2Score(prev => Math.max(0, prev - 100));
+        setPlayer2Combo(0);
+        showIndicator('player2', 'miss');
+      }
+      return true;
+    }
+    return false;
+  };
 
   // Key press handler for gameplay
   useEffect(() => {
     if (gameState !== 'playing') return;
-
     const handleKeyPress = (e) => {
       const key = e.key.toLowerCase();
       const player = ['w', 'a', 's', 'd'].includes(key) ? 'player1' : 'player2';
@@ -203,116 +319,115 @@ const Game = ({ songFile, songTimingKey, onBackToSelection }) => {
         arrowright: 'right',
         arrowdown: 'down',
       };
-
       const direction = directionMap[key] || directionMap[e.code.toLowerCase().replace('arrow', '')];
       if (!direction) return;
 
-      const currentTime = Date.now() - startTime.current;
+      // Record the key press time for anti-spam
+      const now = Date.now();
+      if (player === 'player1') {
+        player1KeyPresses.current.push(now);
+      } else {
+        player2KeyPresses.current.push(now);
+      }
 
+      // Check for spamming before processing the key press
+      if (checkForSpam(player)) {
+        return;
+      }
+
+      const currentTime = Date.now() - startTime.current;
       setArrows((prevArrows) => {
         let arrowHit = false;
-        let hitQuality = 0; // 0: miss, 1: ok, 2: good, 3: perfect
+        let hitQuality = 0;
 
-        // Find the closest arrow for this direction and player
         const arrowsForPlayerDirection = prevArrows.filter(
           arrow => arrow.player === player &&
             arrow.direction === direction &&
             !arrow.hit &&
-            !arrow.missed
+            !arrow.missed &&
+            Math.abs(currentTime - arrow.targetTime) <= hitWindow
         );
 
-        // Sort by how close they are to their target time
-        arrowsForPlayerDirection.sort((a, b) =>
-          Math.abs(currentTime - a.targetTime) - Math.abs(currentTime - b.targetTime)
-        );
-
-        // Check if we have an arrow to hit
         if (arrowsForPlayerDirection.length > 0) {
           const closestArrow = arrowsForPlayerDirection[0];
           const timeDifference = Math.abs(currentTime - closestArrow.targetTime);
-
-          if (timeDifference <= hitWindow) {
-            arrowHit = true;
-
-            // Determine hit quality - Modified scoring
-            if (timeDifference <= hitWindow / 4) {
-              hitQuality = 3; // Perfect
-            } else if (timeDifference <= hitWindow / 2) {
-              hitQuality = 2; // Good
-            } else {
-              hitQuality = 1; // Ok
-            }
+          arrowHit = true;
+          if (timeDifference <= hitWindow / 4) {
+            hitQuality = 3;
+            showIndicator(player, 'perfect');
+          } else if (timeDifference <= hitWindow / 2) {
+            hitQuality = 2;
+            showIndicator(player, 'good');
+          } else {
+            hitQuality = 1;
+            showIndicator(player, 'ok');
           }
+        } else {
+          if (player === 'player1') {
+            setPlayer1Combo(0);
+            showIndicator(player, 'miss');
+          } else {
+            setPlayer2Combo(0);
+            showIndicator(player, 'miss');
+          }
+          return prevArrows;
         }
 
-        // Update arrows
         const updatedArrows = prevArrows.map(arrow => {
-          if (arrowHit &&
-            arrow === arrowsForPlayerDirection[0]) {
+          if (arrowHit && arrow === arrowsForPlayerDirection[0]) {
+            if (player === 'player1') {
+              setPlayer1Stats(prev => {
+                const updatedStats = { ...prev, arrowsHit: prev.arrowsHit + 1 };
+                if (hitQuality === 3) updatedStats.perfectHits++;
+                else if (hitQuality === 2) updatedStats.goodHits++;
+                else if (hitQuality === 1) updatedStats.okHits++;
+                return updatedStats;
+              });
+            } else {
+              setPlayer2Stats(prev => {
+                const updatedStats = { ...prev, arrowsHit: prev.arrowsHit + 1 };
+                if (hitQuality === 3) updatedStats.perfectHits++;
+                else if (hitQuality === 2) updatedStats.goodHits++;
+                else if (hitQuality === 1) updatedStats.okHits++;
+                return updatedStats;
+              });
+            }
             return { ...arrow, hit: true, hitQuality };
           }
           return arrow;
         });
 
-        // Update hit feedback and score with new scoring system
         if (arrowHit) {
-          // Update score based on hit quality - Modified scores
           let baseScore = 0;
           switch (hitQuality) {
-            case 3: // Perfect
-              baseScore = 150;
-              break;
-            case 2: // Good
-              baseScore = 100;
-              break;
-            case 1: // Ok
-              baseScore = 50;
-              break;
-            default:
-              baseScore = 0;
+            case 3: baseScore = 75; break;
+            case 2: baseScore = 50; break;
+            case 1: baseScore = 25; break;
+            default: baseScore = 0;
           }
 
+          // Enhanced combo bonus - more rewarding for longer combos
           if (player === 'player1') {
-            // Update the player1 combo first
             setPlayer1Combo(prevCombo => {
-              const newCombo = prevCombo + .5;
-              // Update max combo
-              if (newCombo > player1MaxCombo) {
-                setPlayer1MaxCombo(newCombo);
-              }
-              
-              // Calculate score with the new combo value
-              const totalScore = Math.round(baseScore * (1 + newCombo / 100));
+              const newCombo = prevCombo + 0.5;
+              if (newCombo > player1MaxCombo) setPlayer1MaxCombo(newCombo);
+              // Combo bonus scales exponentially (capped at 100%)
+              const comboBonus = Math.min(newCombo / 10, 1.0);
+              const totalScore = Math.round(baseScore * (1 + comboBonus));
               setPlayer1Score(prev => prev + totalScore);
-              
               return newCombo;
             });
           } else {
-            // Update the player2 combo first
             setPlayer2Combo(prevCombo => {
-              const newCombo = prevCombo + .5;
-              // Update max combo
-              if (newCombo > player2MaxCombo) {
-                setPlayer2MaxCombo(newCombo);
-              }
-              
-              // Calculate score with the new combo value
-              const totalScore = Math.round(baseScore * (1 + newCombo / 100));
+              const newCombo = prevCombo + 0.5;
+              if (newCombo > player2MaxCombo) setPlayer2MaxCombo(newCombo);
+              const comboBonus = Math.min(newCombo / 10, 1.0);
+              const totalScore = Math.round(baseScore * (1 + comboBonus));
               setPlayer2Score(prev => prev + totalScore);
-              
               return newCombo;
             });
-          }
-        } else {
-          // If no arrow was hit, it's a miss
-          // Reset combo on miss
-          if (player === 'player1') {
-            setPlayer1Combo(0);
-          } else {
-            setPlayer2Combo(0);
           }
         }
-
         return updatedArrows;
       });
     };
@@ -331,7 +446,6 @@ const Game = ({ songFile, songTimingKey, onBackToSelection }) => {
     };
   }, []);
 
-  // Helper function to get the appropriate image
   const getArrowImage = (direction) => {
     switch (direction) {
       case 'left': return leftArrow;
@@ -342,7 +456,6 @@ const Game = ({ songFile, songTimingKey, onBackToSelection }) => {
     }
   };
 
-  // Handle returning to song selection
   const handleReturn = () => {
     if (audioRef.current) {
       audioRef.current.pause();
@@ -350,93 +463,124 @@ const Game = ({ songFile, songTimingKey, onBackToSelection }) => {
     onBackToSelection();
   };
 
-  // Render the appropriate game state
-  const renderGameContent = () => {
-    if (gameState === 'waiting') {
-      return (
-        <div className="ready-screen">
+  const getIndicatorClass = (type) => {
+    return type === 'hit' ? 'hit' : 'miss'; // Now returns 'hit' or 'miss' class
+  };
+
+  const getIndicatorText = (type) => {
+    return type === 'hit' ? 'HIT' : 'MISS';
+  };
+
+  // Calculate accuracy percentage
+  const calculateAccuracy = (stats) => {
+    if (stats.totalArrows === 0) return '0%';
+    const accuracy = (stats.arrowsHit / stats.totalArrows) * 100 / 2;
+    return `${accuracy.toFixed(1)}%`;
+  };
+
+  const renderReadyScreen = () => {
+    return (
+      <div className="ready-wrapper">
+        <div className="ready-container">
+          <h2 className="ready-title">Pulse</h2>
           <div className={`ready-prompt ${player1Ready ? 'ready' : ''}`}>
-            Player 1, press any key (WASD) to ready up.
+            Welcome Player 1. <br /> Press any key (←↑→↓) to ready up.
             {player1Ready && <div className="ready-check">✓</div>}
           </div>
+          <button className="back-button" onClick={handleReturn}>
+            Back to Song Selection (Press *)
+          </button>
+        </div>
+        <div className="ready-container">
+          <h2 className="ready-title">Pulse</h2>
           <div className={`ready-prompt ${player2Ready ? 'ready' : ''}`}>
-            Player 2, press any key (←↑→↓) to ready up.
+            Welcome Player 2. <br /> Press any key (←↑→↓) to ready up.
             {player2Ready && <div className="ready-check">✓</div>}
           </div>
           <button className="back-button" onClick={handleReturn}>
-            Back to Songs
+            Back to Song Selection (Press *)
           </button>
         </div>
-      );
+      </div>
+    );
+  };
+
+  const renderGameContent = () => {
+    if (gameState === 'waiting') {
+      return renderReadyScreen();
     } else if (gameState === 'ended') {
       return (
-        <div className="game-ended">
-          <h2>Game Over!</h2>
-          <div className="final-scores">
-            <div className="final-player-score">
-              <h3>Player 1</h3>
-              <div className="final-score">{player1Score}</div>
-              <div className="final-combo">Max Combo: {player1MaxCombo}</div>
+        <div className="game-ended-wrapper">
+          <div className="end-container">
+            <h2 className="end-title">Game Over</h2>
+            <div className="end-player-score">
+              <h3 className="end-player-header">Player 1 Stats:</h3>
+              <div className="end-score-display">Personal Score: {player1Score}</div>
+
+              {/* New: Individual player stats at the end */}
+              <div className="player-stats">
+                <div className="stat-row">Perfect Arrows: {player1Stats.perfectHits/2}</div>
+                <div className="stat-row">Good Arrows: {player1Stats.goodHits/2}</div>
+                <div className="stat-row">Okay Arrows: {player1Stats.okHits/2}</div>
+                <div className="stat-row">Misses: {player1Stats.misses/2}</div>
+                <div className="stat-row">Accuracy: {calculateAccuracy(player1Stats)}</div>
+                <div className="stat-row">Max Combo: {Math.floor(player1MaxCombo)}</div>
+              </div>
+
+              <div className="end-team-score">
+                Total Team Score: {player1Score + player2Score}
+              </div>
             </div>
-            <div className="final-player-score">
-              <h3>Player 2</h3>
-              <div className="final-score">{player2Score}</div>
-              <div className="final-combo">Max Combo: {player2MaxCombo}</div>
+            <div className={`ready-to-go-back ${player1ReadyToGoBack ? 'ready' : ''}`}>
+              {player1ReadyToGoBack ? 'Readied up! (Press * to cancel)' : 'Back to Songs. (Press * to ready up)'}
+              {player1ReadyToGoBack && <span className="ready-check">✓</span>}
+              {player1ReadyToGoBack && <div className="cancel-info">Press Q to cancel ready</div>}
             </div>
           </div>
-          <div className="winner">
-            {player1Score > player2Score
-              ? 'Player 1 Wins!'
-              : player2Score > player1Score
-                ? 'Player 2 Wins!'
-                : 'It\'s a Tie!'}
+          <div className="end-container">
+            <h2 className="end-title">Game Over</h2>
+            <div className="end-player-score">
+              <h3 className="end-player-header">Player 2 Stats:</h3>
+              <div className="end-score-display">Personal Score: {player2Score}</div>
+
+              {/* New: Individual player stats at the end */}
+              <div className="player-stats">
+                <div className="stat-row">Perfect Arrows: {player2Stats.perfectHits/2}</div>
+                <div className="stat-row">Good Arrows: {player2Stats.goodHits/2}</div>
+                <div className="stat-row">Okay Arrows: {player2Stats.okHits/2}</div>
+                <div className="stat-row">Misses: {player2Stats.misses/2}</div>
+                <div className="stat-row">Accuracy: {calculateAccuracy(player2Stats)}</div>
+                <div className="stat-row">Max Combo: {Math.floor(player2MaxCombo)}</div>
+              </div>
+
+              <div className="end-team-score">
+                Total Team Score: {player1Score + player2Score}
+              </div>
+            </div>
+            <div className={`ready-to-go-back ${player2ReadyToGoBack ? 'ready' : ''}`}>
+              {player2ReadyToGoBack ? 'Readied up! (Press * to cancel)' : 'Back to Songs. (Press * to ready up)'}
+              {player2ReadyToGoBack && <span className="ready-check">✓</span>}
+              {player2ReadyToGoBack && <div className="cancel-info">Press 1 to cancel ready</div>}
+            </div>
           </div>
-          <button className="play-again-button" onClick={handleReturn}>
-            Back to Song Selection
-          </button>
         </div>
       );
     } else {
-      // Main gameplay UI
       return (
         <>
           <div className="lanes">
             <div className="player-section">
               <div className="player-header">Player 1</div>
+
+              {/* team score box */}
+              <div className="score-container">
+                <div className="score-box">Team Score: {player1Score + player2Score}</div>
+              </div>
+
               <div className="player-lanes player1">
                 {directions.map((direction) => (
                   <div key={`player1-${direction}`} className={`lane ${direction}`}>
-                    <div className="static-arrow">
-                      <img src={getArrowImage(direction)} alt={direction} />
-                    </div>
-                    {arrows
-                      .filter((arrow) => arrow.player === 'player1' && arrow.direction === direction && !arrow.hit)
-                      .map((arrow) => (
-                        <Arrow
-                          key={arrow.id}
-                          direction={arrow.direction}
-                          player={arrow.player}
-                          missed={arrow.missed}
-                        />
-                      ))}
-                  </div>
-                ))}
-              </div>
-              <div className="score-container">
-                <div className="score-box">{player1Score}</div>
-                <div className="combo-display">
-                  Combo x{player1Combo}
-                </div>
-              </div>
-              <div className="controls-guide player1-controls">
-                <span className="key">W</span> <span className="key">A</span> <span className="key">S</span> <span className="key">D</span>
-              </div>
-            </div>
-            <div className="player-section">
-              <div className="player-header">Player 2</div>
-              <div className="player-lanes player2">
-                {directions.map((direction) => (
-                  <div key={`player2-${direction}`} className={`lane ${direction}`}>
+                    <div className="guideline"></div>
                     <div className="static-arrow">
                       <img src={getArrowImage(direction)} alt={direction} />
                     </div>
@@ -446,21 +590,71 @@ const Game = ({ songFile, songTimingKey, onBackToSelection }) => {
                         <Arrow
                           key={arrow.id}
                           direction={arrow.direction}
-                          player={arrow.player}
+                          player="player1"
                           missed={arrow.missed}
                         />
                       ))}
                   </div>
                 ))}
               </div>
-              <div className="score-container">
-                <div className="score-box">{player2Score}</div>
-                <div className="combo-display">
-                  Combo x{player2Combo}
+
+              {player1Indicator.show && (
+                <div className={`hit-indicator ${getIndicatorClass(player1Indicator.type)}`}>
+                  {getIndicatorText(player1Indicator.type)}
                 </div>
+              )}
+
+              {/* Combo display */}
+              <div className="combo-display">
+                Combo: {Math.floor(player1Combo)}
               </div>
+
+              <div className="controls-guide player1-controls">
+                <span className="key">L (←)</span> <span className="key">U (↑)</span> <span className="key">R (→)</span> <span className="key">D (↓)</span>
+              </div>
+            </div>
+            
+            <div className="player-section">
+              <div className="player-header">Player 2</div>
+
+              {/* team score box */}
+              <div className="score-container">
+                <div className="score-box">Team Score: {player1Score + player2Score}</div>
+              </div>
+
+              <div className="player-lanes player2">
+                {directions.map((direction) => (
+                  <div key={`player2-${direction}`} className={`lane ${direction}`}>
+                    <div className="guideline"></div>
+                    <div className="static-arrow">
+                      <img src={getArrowImage(direction)} alt={direction} />
+                    </div>
+                    {arrows
+                      .filter((arrow) => arrow.player === 'player1' && arrow.direction === direction && !arrow.hit)
+                      .map((arrow) => (
+                        <Arrow
+                          key={arrow.id}
+                          direction={arrow.direction}
+                          player="player2"
+                          missed={arrow.missed}
+                        />
+                      ))}
+                  </div>
+                ))}
+              </div>
+              {player2Indicator.show && (
+                <div className={`hit-indicator ${getIndicatorClass(player2Indicator.type)}`}>
+                  {getIndicatorText(player2Indicator.type)}
+                </div>
+              )}
+
+              {/* Combo display */}
+              <div className="combo-display">
+                Combo: {Math.floor(player2Combo)}
+              </div>
+
               <div className="controls-guide player2-controls">
-                <span className="key">↑</span> <span className="key">←</span> <span className="key">↓</span> <span className="key">→</span>
+                <span className="key">L (←)</span> <span className="key">U (↑)</span> <span className="key">R (→)</span> <span className="key">D (↓)</span>
               </div>
             </div>
           </div>
@@ -470,11 +664,8 @@ const Game = ({ songFile, songTimingKey, onBackToSelection }) => {
   };
 
   return (
-    <div className="game-container">
-      <div className="game">
-        <h1 className="game-title">Pulse</h1>
-        {renderGameContent()}
-      </div>
+    <div className="game">
+      {renderGameContent()}
     </div>
   );
 };
