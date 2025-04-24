@@ -37,7 +37,8 @@ import strMp3 from "../assets/mp3Files/something_to_remember.mp3";
 // import gokMp3 from "../assets/mp3Files/god_only_knows.mp3";
 // import fgMp3 from "../assets/mp3Files/feeling_good.mp3";
 
-const SongSelection = ({ onSongSelect }) => {
+
+const SongSelection = ({ onSongSelect, onBackToMenu  }) => {
   const [focusedIndex, setFocusedIndex] = useState(0);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [direction, setDirection] = useState(null);
@@ -137,21 +138,23 @@ const SongSelection = ({ onSongSelect }) => {
   useEffect(() => {
     const handleKeyDown = (e) => {
       const key = e.key.toLowerCase();
-
+  
       if (["arrowleft", "a"].includes(key)) {
         navigateCarousel('left');
       } else if (["arrowright", "d"].includes(key)) {
         navigateCarousel('right');
-      } else if (["enter", "*", "q", "1"].includes(key)) { // Use Enter or '*' to select
+      } else if (["enter", "*", "q", "1"].includes(key)) {
         handleSongSelect(songs[focusedIndex]);
-      } else if (["e", "2", "ó"].includes(key)) { // Random song with E, 2, or ó
+      } else if (["e", "2", "ó"].includes(key)) {
         handleRandomSong();
+      } else if (["arrowdown", "s"].includes(key)) {
+        onBackToMenu(); // Add this line to handle back to menu
       }
     };
-
+  
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [focusedIndex, songs, handleSongSelect, navigateCarousel, handleRandomSong]);
+  }, [focusedIndex, songs, handleSongSelect, navigateCarousel, handleRandomSong, onBackToMenu]);
 
   const getPositionClass = useCallback((itemIndex, centerIndex) => {
     const directDist = Math.abs(itemIndex - centerIndex);
@@ -201,15 +204,9 @@ const SongSelection = ({ onSongSelect }) => {
   return (
     <>
       <div className="song-selection-wrapper">
-        {/* Player 1 Selection */}
         <div className="song-selection-container">
           <div className="player-label">Player 1</div>
           <p className="selection-instruction">Use ←/→ keys to select a song. <br></br>Songs increase in difficulty panning to the right.</p>
-
-          <button className="random-song-button" onClick={handleRandomSong}>
-            Press ó for a random song.<br></br>Press * to start the game.
-            <span className="button-glow"></span>
-          </button>
 
           <div className="song-carousel-viewport">
             <div className="song-carousel-container">
@@ -238,17 +235,30 @@ const SongSelection = ({ onSongSelect }) => {
               Difficulty: {focusedSong.rating.toFixed(1)}
             </div>
           </div>
+
+          <div className="action-buttons-container">
+            <div className="action-button">
+              <span className="action-key">*</span>
+              <span className="action-label">Start Game</span>
+            </div>
+            
+            <div className="action-button">
+              <span className="action-key">↓</span>
+              <span className="action-label">Back to Main Menu</span>
+            </div>
+
+            <div className="action-button">
+              <span className="action-key">ó</span>
+              <span className="action-label">Select Random Song</span>
+            </div>
+          </div>
         </div>
 
         {/* Player 2 Selection*/}
         <div className="song-selection-container">
           <div className="player-label">Player 2</div>
-          <p className="selection-instruction">Use ←/→ keys to select a song. Press * to start.</p>
+          <p className="selection-instruction">Use ←/→ keys to select a song. <br></br>Songs increase in difficulty panning to the right.</p>
 
-          <button className="random-song-button" onClick={handleRandomSong}>
-            Press ó for a random song.
-            <span className="button-glow"></span>
-          </button>
 
           <div className="song-carousel-viewport">
             <div className="song-carousel-container">
@@ -275,6 +285,21 @@ const SongSelection = ({ onSongSelect }) => {
             <p className="selected-song-artist">{focusedSong.artist}</p>
             <div className={`song-rating ${getRatingClass(focusedSong.rating)}`}>
               Difficulty: {focusedSong.rating.toFixed(1)}
+            </div>
+          </div>
+
+          <div className="action-buttons-container">
+            <div className="action-button">
+              <span className="action-key">*</span>
+              <span className="action-label">Start Game</span>
+            </div>
+            <div className="action-button">
+              <span className="action-key">↓</span>
+              <span className="action-label">Back to Main Menu</span>
+            </div>
+            <div className="action-button">
+              <span className="action-key">ó</span>
+              <span className="action-label">Select Random Song</span>
             </div>
           </div>
         </div>
@@ -312,7 +337,7 @@ const SongSelection = ({ onSongSelect }) => {
           display: flex;
           justify-content: center;
           align-items: stretch;
-          gap: 1000px;
+          gap: 110px;
           width: 100%;
           max-width: 1800px;
           padding: 30px 20px;
@@ -570,7 +595,7 @@ const SongSelection = ({ onSongSelect }) => {
         .song-rating {
           padding: 7px 18px;
           border-radius: 20px;
-          margin-bottom: 25px;
+          margin-bottom: 95px;
           font-size: 0.9rem;
           font-weight: 600;
           letter-spacing: 0.5px;
@@ -597,6 +622,47 @@ const SongSelection = ({ onSongSelect }) => {
           background: linear-gradient(135deg, #F44336, #C62828); 
         }
 
+        .action-buttons-container {
+          display: flex;
+          justify-content: center;
+          gap: 25px;
+          margin-top: 10px;
+          margin-bottom: 5px;
+          flex-wrap: wrap;
+        }
+
+        .action-button {
+          display: flex;
+          align-items: center;
+          gap: 8px;
+          padding: 8px 12px;
+          background: rgba(0, 0, 0, 0.05);
+          border-radius: 20px;
+          transition: all 0.2s ease;
+        }
+
+        .action-button:hover {
+          background: rgba(0, 0, 0, 0.08);
+          transform: translateY(-1px);
+        }
+
+        .action-key {
+          font-weight: 700;
+          color: var(--primary);
+          background: rgba(255, 255, 255, 0.9);
+          padding: 3px 8px;
+          border-radius: 50%;
+          min-width: 20px;
+          text-align: center;
+          box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        .action-label {
+          font-size: 0.9rem;
+          color: var(--text-dark);
+          white-space: nowrap;
+        }
+          
         /* Responsive adjustments */
         @media (max-width: 1100px) {
           .song-selection-wrapper {
@@ -614,6 +680,18 @@ const SongSelection = ({ onSongSelect }) => {
           .random-song-button {
             font-size: 0.85rem;
             padding: 7px 16px;
+          }
+
+          .action-buttons-container {
+            gap: 15px;
+          }
+          
+          .action-button {
+            padding: 6px 10px;
+          }
+          
+          .action-label {
+            font-size: 0.85rem;
           }
         }
 
@@ -647,6 +725,18 @@ const SongSelection = ({ onSongSelect }) => {
           .random-song-button {
             font-size: 0.8rem;
             padding: 6px 14px;
+          }
+
+          .action-buttons-container {
+            gap: 10px;
+          }
+          
+          .action-button {
+            padding: 5px 8px;
+          }
+          
+          .action-label {
+            font-size: 0.8rem;
           }
         }
       `}</style>

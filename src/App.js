@@ -1,31 +1,34 @@
 import React, { useState } from 'react';
 import Game from './components/Game';
 import SongSelection from './components/SongSelection';
+import StartMenu from './components/StartMenu';
 import './App.css';
 
 function App() {
-  const [gameState, setGameState] = useState('selection'); // 'selection' or 'game'
+  const [gameState, setGameState] = useState('start');
   const [selectedSong, setSelectedSong] = useState(null);
-
-  // Modified to not expect any parameters
-  const handleBackToSelection = () => {
-    setGameState('selection'); // Change to 'selection' instead of 'songSelection'
-  };
 
   return (
     <div className="App">
-      {gameState === 'selection' ? (
+      {gameState === 'start' && (
+        <StartMenu
+          onStartGame={() => setGameState('selection')}
+        />
+      )}
+      {gameState === 'selection' && (
         <SongSelection
           onSongSelect={(song) => {
             setSelectedSong(song);
             setGameState('game');
           }}
+          onBackToMenu={() => setGameState('start')}  // This is what you need to add
         />
-      ) : (
+      )}
+      {gameState === 'game' && (
         <Game 
           songFile={selectedSong.file}
           songTimingKey={selectedSong.timingKey}
-          onBackToSelection={handleBackToSelection}
+          onBackToSelection={() => setGameState('start')}
         />
       )}
     </div>
