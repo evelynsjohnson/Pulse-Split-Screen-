@@ -7,6 +7,7 @@ import './App.css';
 function App() {
   const [gameState, setGameState] = useState('start');
   const [selectedSong, setSelectedSong] = useState(null);
+  const [lastSelectedSongIndex, setLastSelectedSongIndex] = useState(0); // Add this line
 
   return (
     <div className="App">
@@ -17,18 +18,20 @@ function App() {
       )}
       {gameState === 'selection' && (
         <SongSelection
-          onSongSelect={(song) => {
+          onSongSelect={(song, index) => { // Add index parameter
             setSelectedSong(song);
+            setLastSelectedSongIndex(index); // Store the index
             setGameState('game');
           }}
-          onBackToMenu={() => setGameState('start')}  // This is what you need to add
+          onBackToMenu={() => setGameState('start')}
+          initialFocusedIndex={lastSelectedSongIndex} // Pass the last index
         />
       )}
       {gameState === 'game' && (
         <Game 
           songFile={selectedSong.file}
           songTimingKey={selectedSong.timingKey}
-          onBackToSelection={() => setGameState('start')}
+          onBackToSelection={() => setGameState('selection')} // Change to go back to selection
         />
       )}
     </div>

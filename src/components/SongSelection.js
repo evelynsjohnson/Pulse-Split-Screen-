@@ -34,30 +34,35 @@ import gladiatorMp3 from "../assets/mp3Files/gladiator.mp3";
 import stargazingMp3 from "../assets/mp3Files/stargazing.mp3";
 import strMp3 from "../assets/mp3Files/something_to_remember.mp3";
 // import bleedMp3 from "../assets/mp3Files/bleed.mp3";
-// import gokMp3 from "../assets/mp3Files/god_only_knows.mp3";
+import gokMp3 from "../assets/mp3Files/god_only_knows.mp3";
 // import fgMp3 from "../assets/mp3Files/feeling_good.mp3";
 
 
-const SongSelection = ({ onSongSelect, onBackToMenu  }) => {
-  const [focusedIndex, setFocusedIndex] = useState(0);
+const SongSelection = ({ onSongSelect, onBackToMenu, initialFocusedIndex = 0 }) => {
+  const [focusedIndex, setFocusedIndex] = useState(initialFocusedIndex);
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [direction, setDirection] = useState(null);
   const [visibleIndices, setVisibleIndices] = useState([]);
 
   const songs = [
-    { id: "str", title: "Something to Remember [**Special]", artist: "Matt Hansen", cover: strCover, file: strMp3, timingKey: "STRSongTiming", rating: 5 },
-    { id: "paris", title: "Paris", artist: "The Chainsmokers", cover: parisCover, file: parisMp3, timingKey: "ParisSongTiming", rating: 3},
-    { id: "starg", title: "Stargazing", artist: "Myles Smith", cover: stargazingCover, file: stargazingMp3, timingKey: "StargazingSongTiming", rating: 3.5 },
+    { id: "paris", title: "Paris", artist: "The Chainsmokers", cover: parisCover, file: parisMp3, timingKey: "ParisSongTiming", rating: 1},
+    { id: "starg", title: "Stargazing", artist: "Myles Smith", cover: stargazingCover, file: stargazingMp3, timingKey: "StargazingSongTiming", rating: 1.5 },
+
+    { id: "teeth", title: "Teeth", artist: "5 Seconds of Summer", cover: teethCover, file: teethMp3, timingKey: "TeethSongTiming", rating: 4.5 },
+    { id: "str", title: "Something to Remember", artist: "Matt Hansen", cover: strCover, file: strMp3, timingKey: "STRSongTiming", rating: 5 },
+    { id: "fyo", title: "Figure You Out", artist: "BB Cooper", cover: fyoCover, file: fyoMp3, timingKey: "FYOSongTiming", rating: 5.5 },
+    { id: "gok", title: "God Only Knows", artist: "Tokyo Project, Brad Arthur", cover: gokCover, file: gokMp3, timingKey: "GOKSongTiming", rating: 5.5 },
     { id: "gladi", title: "Gladiator", artist: "Jann", cover: gladiatorCover, file: gladiatorMp3, timingKey: "GladiatorSongTiming", rating: 6 },
-    { id: "teeth", title: "Teeth", artist: "5 Seconds of Summer", cover: teethCover, file: teethMp3, timingKey: "TeethSongTiming", rating: 6.5 },
-    { id: "fyo", title: "Figure You Out", artist: "BB Cooper", cover: fyoCover, file: fyoMp3, timingKey: "FYOSongTiming", rating: 7.0 },
-    { id: "sharks", title: "Sharks", artist: "Imagine Dragons", cover: sharksCover, file: sharksMp3, timingKey: "SharksSongTiming", rating: 7.0 },
-    { id: "lifef", title: "Life Force [No Lyrics]", artist: "ptasinski, RJ Pasin", cover: lifefCover, file: lifefMp3, timingKey: "LifeForceSongTiming", rating: 7.5 },
-    { id: "eotr", title: "End of the Road", artist: "Layto", cover: eotrCover, file: eotrMp3, timingKey: "EOTRSongTiming", rating: 8 },
-    { id: "insane", title: "Insane", artist: "Black Gryph0n, Baasik", cover: insaneCover, file: insaneMp3, timingKey: "InsaneSongTiming", rating: 8.5 },
-    { id: "bang", title: "Bang Bang", artist: "Ariana Grande, Jessie J, and Nicki Minaj", cover: bangCover, file: bangMp3, timingKey: "BangSongTiming", rating: 8.0 },
-    { id: "soy", title: "Shape of You [Unrevised]", artist: "Ed Sheeran", cover: soyCover, file: soyMp3, timingKey: "SOYSongTiming", rating: 1000.0 },
-    { id: "yiam", title: "Yes I'm a Mess [Unrevised]", artist: "AJR", cover: yiamCover, file: yiamMp3, timingKey: "YIAMSongTiming", rating: 1000.0 },
+    { id: "sharks", title: "Sharks", artist: "Imagine Dragons", cover: sharksCover, file: sharksMp3, timingKey: "SharksSongTiming", rating: 6.0 },
+    { id: "eotr", title: "End of the Road", artist: "Layto", cover: eotrCover, file: eotrMp3, timingKey: "EOTRSongTiming", rating: 7 },
+    { id: "yiam", title: "Yes I'm a Mess", artist: "AJR", cover: yiamCover, file: yiamMp3, timingKey: "YIAMSongTiming", rating: 7.0 },
+    
+    { id: "lifef", title: "Life Force [No Lyrics]", artist: "ptasinski, RJ Pasin", cover: lifefCover, file: lifefMp3, timingKey: "LifeForceSongTiming", rating: 9.5 },
+    { id: "bang", title: "Bang Bang", artist: "Ariana Grande, Jessie J, and Nicki Minaj", cover: bangCover, file: bangMp3, timingKey: "BangSongTiming", rating: 10 },
+    { id: "insane", title: "Insane", artist: "Black Gryph0n, Baasik", cover: insaneCover, file: insaneMp3, timingKey: "InsaneSongTiming", rating: 10 },
+
+    
+    // { id: "soy", title: "Shape of You", artist: "Ed Sheeran", cover: soyCover, file: soyMp3, timingKey: "SOYSongTiming", rating: 1000.0 },
   ];
 
   /*
@@ -75,8 +80,8 @@ const SongSelection = ({ onSongSelect, onBackToMenu  }) => {
 
   const handleSongSelect = useCallback((song) => {
     console.log("Song selected:", song.title);
-    onSongSelect(song);
-  }, [onSongSelect]);
+    onSongSelect(song, focusedIndex); // Pass the current focusedIndex
+  }, [onSongSelect, focusedIndex]);
 
   const getCarouselIndices = useCallback((centerIndex, includeOffscreen = false) => {
     const indices = [];

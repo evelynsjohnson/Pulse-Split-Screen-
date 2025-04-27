@@ -11,13 +11,9 @@
 
   --background: linear-gradient(-45deg,
       rgba(255, 81, 81, 0.5),
-      rgba(255, 194, 81, 0.5),
-      rgba(255, 243, 81, 0.5),
-      rgba(81, 255, 104, 0.5),
       rgba(81, 220, 255, 0.5),
       rgba(81, 93, 255, 0.5),
-      rgba(200, 81, 255, 0.5),
-      rgba(255, 81, 154, 0.5));
+      rgba(200, 81, 255, 0.5));
   --background-animation-duration: 25s;
 }
 
